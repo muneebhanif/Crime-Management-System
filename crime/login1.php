@@ -95,12 +95,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($count == 1) {
             // Set user as online and update last activity
             $user_id = $row['user_id'];
-            $update_status = "UPDATE users SET is_online = 1, last_activity = NOW() WHERE user_id = '$user_id'";
-            mysqli_query($conn, $update_status);
-
-            $_SESSION['login_user'] = $myusername;
-            $_SESSION['user_id'] = $user_id;
-            $_SESSION['role'] = $row['role'];
 
             // Handle Remember Me
             if (isset($_POST['remember_me']) && $_POST['remember_me'] == 'on') {
@@ -117,7 +111,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Set cookie with the token
                 setcookie("user_login", $token, time() + (86400 * 30), "/");
+            } else {
+                // If remember me is not checked, remove any existing tokens and cookie
+                $delete_tokens = "DELETE FROM remember_me_tokens WHERE user_id = '$user_id'";
+                mysqli_query($conn, $delete_tokens);
+
+                // Remove the cookie by setting it to expire in the past
+                setcookie("user_login", "", time() - 3600, "/");
             }
+
+            $_SESSION['login_user'] = $myusername;
+            $_SESSION['user_id'] = $user_id;
+            $_SESSION['role'] = $row['role'];
 
             // Set session timeout to 30 minutes
             $_SESSION['last_activity'] = time();
