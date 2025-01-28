@@ -343,113 +343,110 @@ include 'config.php';
       </div>
    </div>
 
-   <script>
-      function submitBtn() {
-         const fields = [
-            "Crime_Id", "Head_id", "Name", "Father_name", "CNIC",
-            "Officer_id", "Under_Section", "Date_of_Offence",
-            "Date_of_Report", "Case_status", "Arrested",
-            "Challan", "Gender"
-         ];
-
-         for (let field of fields) {
-            if (!document.forms["crimeInfo"][field]?.value) {
-               alert('Please fill out all the fields');
-               return false;
-            }
-         }
-
-         const dateOffence = new Date(document.forms["crimeInfo"]["Date_of_Offence"].value);
-         const currentYear = new Date().getFullYear();
-
-         if (dateOffence.getFullYear() > currentYear) {
-            alert('Invalid Date of Offence');
-            return false;
-         }
-
-         if (!document.forms["crimeInfo"]["Date_of_Report"].value) {
-            alert('Invalid Date Please Fill Valid Date');
-            return false;
-         }
-
-         // Validate CNIC format if provided
-         const accusedCNIC = document.forms["crimeInfo"]["Accussed_CNIC"].value;
-         const witnessCNIC = document.forms["crimeInfo"]["Witness_CNIC"].value;
-         const cnicPattern = /^\d{5}-\d{7}-\d$/;
-
-         if (accusedCNIC && !cnicPattern.test(accusedCNIC)) {
-            alert('Please enter a valid Accused CNIC format (e.g., 12345-1234567-1)\nبراہ کرم درست ملزم شناختی کارڈ فارمیٹ درج کریں');
-            return false;
-         }
-
-         if (witnessCNIC && !cnicPattern.test(witnessCNIC)) {
-            alert('Please enter a valid Witness CNIC format (e.g., 12345-1234567-1)\nبراہ کرم درست گواہ شناختی کارڈ فارمیٹ درج کریں');
-            return false;
-         }
-
-         alert('Data Stored Successfully!');
-         return true;
-      }
-   </script>
-
    <?php
    if (isset($_POST['submit'])) {
-      $fname = $_FILES['my_img']['name'];
-      $tmpname = $_FILES['my_img']['tmp_name'];
-      $folder = "images/" . $fname;
-      move_uploaded_file($tmpname, $folder);
+      $errors = [];
 
-      $fields = [
-         'Date_of_Offence',
-         'Under_Section',
-         'Date_of_Report',
-         'Case_status',
-         'Arrested',
-         'Challan',
-         'Officer_id',
-         'Name',
-         'Father_name',
-         'CNIC',
-         'Gender'
+      // Check required fields
+      $requiredFields = [
+         'Name' => 'Criminal Name',
+         'Father_name' => 'Father\'s Name',
+         'CNIC' => 'CNIC',
+         'Officer_id' => 'Officer ID',
+         'Under_Section' => 'Under Section',
+         'Date_of_Offence' => 'Date of Offence',
+         'Date_of_Report' => 'Date of Report',
+         'Case_status' => 'Case Status',
+         'Arrested' => 'Arrested',
+         'Challan' => 'Challan',
+         'Gender' => 'Gender'
       ];
 
-      $values = array_map(function ($field) {
-         return "'" . $_POST[$field] . "'";
-      }, $fields);
+      foreach ($requiredFields as $field => $label) {
+         if (empty($_POST[$field])) {
+            $errors[] = "Please fill out the $label field.";
+         }
+      }
 
-      $q1 = "INSERT INTO crime_register (" . implode(", ", $fields) . ", img) 
-               VALUES (" . implode(", ", $values) . ", '$folder')";
+      $dateOffence = strtotime($_POST['Date_of_Offence']);
+      $currentYear = date('Y');
 
-      if (mysqli_query($conn, $q1)) {
-         echo "<script>alert('Record inserted successfully!');</script>";
+      if (date('Y', $dateOffence) > $currentYear) {
+         $errors[] = 'Invalid Date of Offence';
+      }
+
+      $cnicPattern = '/^\d{5}-\d{7}-\d$/';
+
+      if (!empty($_POST['Accussed_CNIC']) && !preg_match($cnicPattern, $_POST['Accussed_CNIC'])) {
+         $errors[] = 'Please enter a valid Accused CNIC format (e.g., 12345-1234567-1)';
+      }
+
+      if (!empty($_POST['Witness_CNIC']) && !preg_match($cnicPattern, $_POST['Witness_CNIC'])) {
+         $errors[] = 'Please enter a valid Witness CNIC format (e.g., 12345-1234567-1)';
+      }
+
+      if (!empty($errors)) {
+         foreach ($errors as $error) {
+            echo "<script>alert('$error');</script>";
+         }
       } else {
-         echo "<script>alert('Error: " . mysqli_error($conn) . "');</script>";
-      }
+         $fname = $_FILES['my_img']['name'];
+         $tmpname = $_FILES['my_img']['tmp_name'];
+         $folder = "images/" . $fname;
+         move_uploaded_file($tmpname, $folder);
 
-      if (!empty($_POST['Accussed_CNIC'])) {
-         $accused_cnic = mysqli_real_escape_string($conn, $_POST['Accussed_CNIC']);
-         $accused_name = mysqli_real_escape_string($conn, $_POST['AccusedName']);
-         $accused_father = mysqli_real_escape_string($conn, $_POST['AccusedFatherName']);
-         $accused_gender = mysqli_real_escape_string($conn, $_POST['AccusedGender']);
-         $accused_remarks = mysqli_real_escape_string($conn, $_POST['AccusedRemarks']);
+         $fields = [
+            'Date_of_Offence',
+            'Under_Section',
+            'Date_of_Report',
+            'Case_status',
+            'Arrested',
+            'Challan',
+            'Officer_id',
+            'Name',
+            'Father_name',
+            'CNIC',
+            'Gender'
+         ];
 
-         $accused_query = "INSERT INTO accussed (Accussed_CNIC, Name, Father_name, Gender, Remarks, crime_id) 
-                          VALUES ('$accused_cnic', '$accused_name', '$accused_father', 
-                                 '$accused_gender', '$accused_remarks', LAST_INSERT_ID())";
-         mysqli_query($conn, $accused_query);
-      }
+         $values = array_map(function ($field) {
+            return "'" . $_POST[$field] . "'";
+         }, $fields);
 
-      if (!empty($_POST['Witness_CNIC'])) {
-         $witness_cnic = mysqli_real_escape_string($conn, $_POST['Witness_CNIC']);
-         $witness_name = mysqli_real_escape_string($conn, $_POST['WitnessName']);
-         $witness_father = mysqli_real_escape_string($conn, $_POST['WitnessFatherName']);
-         $witness_contact = mysqli_real_escape_string($conn, $_POST['WitnessContact']);
-         $witness_remarks = mysqli_real_escape_string($conn, $_POST['WitnessRemarks']);
+         $q1 = "INSERT INTO crime_register (" . implode(", ", $fields) . ", img) 
+                  VALUES (" . implode(", ", $values) . ", '$folder')";
 
-         $witness_query = "INSERT INTO witness (Witness_CNIC, Name, Father_name, Contact, Remarks, crime_id) 
-                          VALUES ('$witness_cnic', '$witness_name', '$witness_father', 
-                                 '$witness_contact', '$witness_remarks', LAST_INSERT_ID())";
-         mysqli_query($conn, $witness_query);
+         if (mysqli_query($conn, $q1)) {
+            echo "<script>alert('Record inserted successfully!');</script>";
+         } else {
+            echo "<script>alert('Error: " . mysqli_error($conn) . "');</script>";
+         }
+
+         if (!empty($_POST['Accussed_CNIC'])) {
+            $accused_cnic = mysqli_real_escape_string($conn, $_POST['Accussed_CNIC']);
+            $accused_name = mysqli_real_escape_string($conn, $_POST['AccusedName']);
+            $accused_father = mysqli_real_escape_string($conn, $_POST['AccusedFatherName']);
+            $accused_gender = mysqli_real_escape_string($conn, $_POST['AccusedGender']);
+            $accused_remarks = mysqli_real_escape_string($conn, $_POST['AccusedRemarks']);
+
+            $accused_query = "INSERT INTO accussed (Accussed_CNIC, Name, Father_name, Gender, Remarks, crime_id) 
+                             VALUES ('$accused_cnic', '$accused_name', '$accused_father', 
+                                    '$accused_gender', '$accused_remarks', LAST_INSERT_ID())";
+            mysqli_query($conn, $accused_query);
+         }
+
+         if (!empty($_POST['Witness_CNIC'])) {
+            $witness_cnic = mysqli_real_escape_string($conn, $_POST['Witness_CNIC']);
+            $witness_name = mysqli_real_escape_string($conn, $_POST['WitnessName']);
+            $witness_father = mysqli_real_escape_string($conn, $_POST['WitnessFatherName']);
+            $witness_contact = mysqli_real_escape_string($conn, $_POST['WitnessContact']);
+            $witness_remarks = mysqli_real_escape_string($conn, $_POST['WitnessRemarks']);
+
+            $witness_query = "INSERT INTO witness (Witness_CNIC, Name, Father_name, Contact, Remarks, crime_id) 
+                             VALUES ('$witness_cnic', '$witness_name', '$witness_father', 
+                                    '$witness_contact', '$witness_remarks', LAST_INSERT_ID())";
+            mysqli_query($conn, $witness_query);
+         }
       }
    }
    ?>

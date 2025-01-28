@@ -8,6 +8,19 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
+// Handle message submission
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !empty($_POST['message'])) {
+    $message = mysqli_real_escape_string($conn, $_POST['message']);
+    $user_id = $_SESSION['admin_id'];
+
+    $insert_query = "INSERT INTO messages_chat (user_id, messages, message_time) VALUES ('$user_id', '$message', NOW())";
+    mysqli_query($conn, $insert_query);
+
+    // Redirect to the same page to clear POST data and prevent resubmission
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit();
+}
+
 // Get users with their status for both roles
 $query = "SELECT user_id as admin_id, username, role, last_activity, is_online,
     CASE 
@@ -19,13 +32,25 @@ $query = "SELECT user_id as admin_id, username, role, last_activity, is_online,
     ORDER BY is_online DESC, last_activity DESC";  // Show online users first, then sort by last activity
 $result = mysqli_query($conn, $query);
 
-// Update messages query to join with users table without using id column
-$messages_query = "SELECT mc.*, u.username 
-                  FROM messages_chat mc 
-                  JOIN users u ON mc.user_id = u.user_id 
-                  ORDER BY mc.user_id DESC 
-                  LIMIT 50";
+// Fetch messages with usernames
+$messages_query = "
+    SELECT 
+        mc.*, 
+        u.username 
+    FROM 
+        messages_chat mc 
+    JOIN 
+        users u ON mc.user_id = u.user_id 
+    ORDER BY 
+        mc.message_time ASC
+";
 $messages_result = mysqli_query($conn, $messages_query);
+$messages = [];
+if ($messages_result) {
+    while ($row = mysqli_fetch_assoc($messages_result)) {
+        $messages[] = $row;
+    }
+}
 
 // Add auto-refresh meta tag in the head section
 ?>
@@ -57,6 +82,50 @@ $messages_result = mysqli_query($conn, $messages_query);
         .status-indicator.offline {
             background-color: #ffe0e0;
             color: #dc3545;
+        }
+
+        .message {
+            max-width: 60%;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            position: relative;
+            word-wrap: break-word;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.mine {
+            margin-left: auto;
+            background-color: #d1e7dd;
+            border-radius: 10px 0 10px 10px;
+            text-align: right;
+        }
+
+        .message.theirs {
+            margin-right: auto;
+            background-color: #ffffff;
+            border-radius: 0 10px 10px 10px;
+            text-align: left;
+        }
+
+        .username {
+            font-size: 0.85em;
+            color: #0d6efd;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .message-text {
+            font-size: 1em;
+            line-height: 1.5;
+        }
+
+        .message-time {
+            font-size: 0.75em;
+            color: #6c757d;
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
         }
     </style>
 </head>
@@ -169,30 +238,36 @@ $messages_result = mysqli_query($conn, $messages_query);
                 <div class="card mt-4">
                     <div class="card-body">
                         <h5 class="card-title fw-semibold mb-4">Admin Chat</h5>
-                        <div class="chat-messages p-4" style="height: 350px; overflow-y: auto;">
-                            <?php while ($message = mysqli_fetch_assoc($messages_result)) { ?>
+                        <div class="chat-messages p-4" id="chatMessages"
+                            style="height: 350px; overflow-y: auto; background-color: #e9ecef; border-radius: 10px;">
+                            <?php foreach ($messages as $message) { ?>
                                 <div
-                                    class="message <?php echo ($message['user_id'] == $_SESSION['admin_id']) ? 'text-end' : ''; ?> mb-3">
-                                    <strong><?php echo htmlspecialchars($message['username']); ?></strong>
-                                    <p class="mb-1"><?php echo htmlspecialchars($message['messages']); ?></p>
+                                    class="message <?php echo ($message['user_id'] == $_SESSION['admin_id']) ? 'mine' : 'theirs'; ?> mb-3">
+                                    <?php if ($message['user_id'] != $_SESSION['admin_id']) { ?>
+                                        <div class="username"><?php echo htmlspecialchars($message['username']); ?></div>
+                                    <?php } ?>
+                                    <div class="message-text"><?php echo htmlspecialchars($message['messages']); ?></div>
+                                    <div class="message-time">
+                                        <?php
+                                        $msg_time = strtotime($message['message_time']);
+                                        $today = strtotime('today');
+
+                                        if ($msg_time >= $today) {
+                                            echo date('h:i A', $msg_time);
+                                        } else if ($msg_time >= strtotime('-1 day')) {
+                                            echo 'Yesterday ' . date('h:i A', $msg_time);
+                                        } else {
+                                            echo date('M d, h:i A', $msg_time);
+                                        }
+                                        ?>
+                                    </div>
                                 </div>
                             <?php } ?>
                         </div>
-                        <?php
-                        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['message'])) {
-                            $user_id = $_SESSION['admin_id'];
-                            $message = mysqli_real_escape_string($conn, $_POST['message']);
-
-                            $insert_query = "INSERT INTO messages_chat (user_id, messages) VALUES (?, ?)";
-                            $stmt = mysqli_prepare($conn, $insert_query);
-                            mysqli_stmt_bind_param($stmt, "is", $user_id, $message);
-                            mysqli_stmt_execute($stmt);
-                        }
-                        ?>
-                        <form method="POST" class="mt-3">
+                        <form method="POST" class="mt-3" id="chatForm">
                             <div class="input-group">
-                                <input type="text" class="form-control" name="message"
-                                    placeholder="Type your message...">
+                                <input type="text" class="form-control" name="message" id="messageInput"
+                                    placeholder="Type your message..." required>
                                 <button class="btn btn-primary" type="submit">Send</button>
                             </div>
                         </form>
@@ -201,32 +276,11 @@ $messages_result = mysqli_query($conn, $messages_query);
             </div>
         </div>
     </div>
-    <script src="../assets/libs/jquery/dist/jquery.min.js"></script>
-    <script src="../assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../assets/js/sidebarmenu.js"></script>
-    <script src="../assets/js/app.min.js"></script>
-    <script src="../assets/libs/simplebar/dist/simplebar.js"></script>
     <script>
-        $(document).ready(function () {
-            $('#chatForm').on('submit', function (e) {
-                e.preventDefault();
-                const message = $('#messageInput').val();
-                if (message.trim()) {
-                    $.ajax({
-                        url: 'send_message.php',
-                        method: 'POST',
-                        data: {
-                            message: message,
-                            user_id: <?php echo $_SESSION['admin_id']; ?>
-                        },
-                        success: function (response) {
-                            $('#messageInput').val('');
-                            location.reload(); // Refresh to see new message
-                        }
-                    });
-                }
-            });
-        });
+        window.onload = function () {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        };
     </script>
 </body>
 
