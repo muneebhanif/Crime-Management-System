@@ -3,15 +3,15 @@ session_start();
 
 include 'config.php';
 
-// Set the timezone - adjust this to your timezone
-date_default_timezone_set('Asia/Kolkata'); // Change this to your timezone
+
+date_default_timezone_set('Asia/Karachi');
 
 $user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 
-// Handle message submission
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
     $message = trim($_POST['message']);
-    $message_time = date('Y-m-d H:i:s'); // Current time with correct timezone
+    $message_time = date('Y-m-d H:i:s');
 
     if (!empty($message) && $user_id > 0) {
         $message = mysqli_real_escape_string($conn, $message);
@@ -258,10 +258,6 @@ $messages = array_reverse($messages);
             const messageContainer = document.getElementById('messageContainer');
             messageContainer.scrollTop = messageContainer.scrollHeight;
         };
-
-        setInterval(function () {
-            window.location.reload();
-        }, 5000);
     </script>
 </body>
 

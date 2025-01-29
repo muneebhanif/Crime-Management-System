@@ -2,13 +2,14 @@
 require_once 'config.php';
 session_start();
 
+date_default_timezone_set('Asia/Karachi'); // Set to Islamabad, Pakistan
+
 // Check if user is logged in as admin
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
     exit();
 }
 
-// Handle message submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !empty($_POST['message'])) {
     $message = mysqli_real_escape_string($conn, $_POST['message']);
     $user_id = $_SESSION['admin_id'];
@@ -51,11 +52,6 @@ if ($messages_result) {
         $messages[] = $row;
     }
 }
-
-// Add auto-refresh meta tag in the head section
-?>
-<meta http-equiv="refresh" content="30"> <!-- Refresh page every 30 seconds -->
-<?php
 ?>
 
 <!doctype html>

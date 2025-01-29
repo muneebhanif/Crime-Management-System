@@ -1,11 +1,21 @@
 <?php
-ob_start(); // Start output buffering
-// Add this at the very top - no whitespace before <?php
+ob_start();
+include 'config.php'; // Start output buffering
 if (!isset($header_included)) {
   $header_included = true;
 } else {
   return;
 }
+
+$newMessagesCount = 0; // Replace with actual database query result
+
+$currentUserId = 1;
+
+$sql = "SELECT COUNT(*) as count FROM messages_chat WHERE status = 'new' AND user_id = $currentUserId";
+$result = mysqli_query($conn, $sql);
+$row = mysqli_fetch_assoc($result);
+$newMessagesCount = $row['count'];
+mysqli_free_result($result);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -121,6 +131,15 @@ if (!isset($header_included)) {
         text-align: center;
       }
     }
+
+    .badge-danger {
+      background-color: red;
+      color: white;
+      border-radius: 50%;
+      padding: 5px;
+      font-size: 0.8em;
+      margin-left: 5px;
+    }
   </style>
 </head>
 
@@ -165,22 +184,17 @@ if (!isset($header_included)) {
             <a class="nav-link" href="chat.php">
               <i class="fas fa-info-circle"></i>
               Chat
+              <?php if ($newMessagesCount > 0): ?>
+                <span class="badge badge-danger"><?php echo $newMessagesCount; ?></span>
+              <?php endif; ?>
             </a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" href="messages.php">
-              <i class="fas fa-info-circle"></i>
-              me
-            </a>
-          </li>
-
           <li class="nav-item">
             <a class="nav-link logout-btn" href="logout.php">
               <i class="fas fa-sign-out-alt"></i>
               Log Out
             </a>
           </li>
-          
         </ul>
       </div>
     </div>
